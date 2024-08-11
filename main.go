@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path"
@@ -27,14 +26,8 @@ func alertToSlack(errs string, slackWebhook string) error {
 	if err != nil {
 		return fmt.Errorf("slack API Post request failed: %w", err)
 	}
+
 	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("error reading response body: %w", err)
-	}
-
-	fmt.Println("Debug Slack API Response: ", string(body))
 	return nil
 }
 
