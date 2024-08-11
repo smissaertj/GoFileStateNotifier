@@ -15,7 +15,10 @@ func main() {
 	}
 
 	errs := getFileInfo(basePath, outputFiles)
-	printErrors(errs)
+	slackErrorMsg := formatErrors(errs)
+	if slackErrorMsg != "" {
+		fmt.Println(slackErrorMsg)
+	}
 }
 
 func getFileInfo(basePath string, files []string) []error {
@@ -50,10 +53,13 @@ func getFileInfo(basePath string, files []string) []error {
 	return errs
 }
 
-func printErrors(errs []error) {
+func formatErrors(errs []error) string {
+	// Format the errors into a single string
+	str := ""
 	if len(errs) > 0 {
 		for _, e := range errs {
-			fmt.Println(e)
+			str = fmt.Sprintf("%s\n", e.Error())
 		}
 	}
+	return str
 }
