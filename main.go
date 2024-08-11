@@ -5,24 +5,77 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path"
+	"strings"
 )
 
-type SlackBody struct {
+type SlackMessage struct {
+	Blocks []Block `json:"blocks"`
+}
+
+type Block struct {
+	Type     string      `json:"type"`
+	Text     *TextObject `json:"text,omitempty"`
+	Elements []Element   `json:"elements,omitempty"`
+}
+
+type TextObject struct {
+	Type  string `json:"type"`
+	Text  string `json:"text"`
+	Emoji *bool  `json:"emoji,omitempty"`
+}
+
+type Element struct {
+	Type string `json:"type"`
 	Text string `json:"text"`
 }
 
-func alertToSlack(errs string, slackWebhook string) error {
-
-	jsonBody, err := json.Marshal(SlackBody{Text: errs})
-	if err != nil {
-		return fmt.Errorf("could not JSON encode data: %w", err)
+func formatSlackPayload(errs string) ([]byte, error) {
+	emoji := true
+	message := SlackMessage{
+		Blocks: []Block{
+			{
+				Type: "header",
+				Text: &TextObject{
+					Type:  "plain_text",
+					Text:  "🚨 Resource Usage App Exception! 🚨",
+					Emoji: &emoji,
+				},
+			},
+			{
+				Type: "section",
+				Text: &TextObject{
+					Type: "mrkdwn",
+					Text: errs,
+				},
+			},
+			{
+				Type: "divider",
+			},
+			{
+				Type: "context",
+				Elements: []Element{
+					{
+						Type: "mrkdwn",
+						Text: "@joeri",
+					},
+				},
+			},
+		},
 	}
-	fmt.Println("alertToSlack JSON Debug: ", string(jsonBody))
 
-	resp, err := http.Post(slackWebhook, "application/json", bytes.NewBuffer(jsonBody))
+	payload, err := json.Marshal(message)
+	if err != nil {
+		return nil, fmt.Errorf("formatSlackPayload: could not JSON encode data: %w", err)
+	}
+	return payload, nil
+}
+
+func alertToSlack(jsonPayload []byte, slackWebhook string) error {
+	resp, err := http.Post(slackWebhook, "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return fmt.Errorf("slack API Post request failed: %w", err)
 	}
@@ -56,8 +109,6 @@ func getFileInfo(basePath string, files []string) []error {
 				err := errors.New("file has 0 bytes of data")
 				err = fmt.Errorf("%w: %s", err, filePath)
 				errs = append(errs, err)
-			default:
-				fmt.Printf("%s exists! File size: %d bytes\n", filePath, fileSize)
 			}
 		}
 	}
@@ -66,20 +117,18 @@ func getFileInfo(basePath string, files []string) []error {
 
 func formatErrors(errs []error) string {
 	// Format the errors into a single string
-	str := ""
-	if len(errs) > 0 {
-		for _, e := range errs {
-			str = fmt.Sprintf("%s\n", e.Error())
-		}
+	var sb strings.Builder
+	for _, e := range errs {
+		sb.WriteString(e.Error())
+		sb.WriteString("\n")
 	}
-	return fmt.Sprintf("```%s```", str) // Slack Code Block
+	return fmt.Sprintf("```%s```", sb.String()) // Slack Code Block
 }
 
 func main() {
 	slackWebhook := os.Getenv("SLACK_WEBHOOK")
 	if slackWebhook == "" {
-		fmt.Println("slack webhook environment variable missing")
-		os.Exit(1)
+		log.Fatal("slack webhook environment variable missing")
 	}
 
 	basePath := "/tmp/my/base_path"
@@ -90,10 +139,14 @@ func main() {
 
 	errs := getFileInfo(basePath, outputFiles)
 	slackErrorMsg := formatErrors(errs)
+
 	if slackErrorMsg != "" {
-		fmt.Println(slackErrorMsg)
-		if err := alertToSlack(slackErrorMsg, slackWebhook); err != nil {
-			fmt.Println(err)
+		payload, err := formatSlackPayload(slackErrorMsg)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		if err := alertToSlack(payload, slackWebhook); err != nil {
+			log.Fatal(err.Error())
 		}
 	}
 }
