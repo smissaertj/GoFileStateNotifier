@@ -72,7 +72,7 @@ func formatErrors(errs []error) string {
 			str = fmt.Sprintf("%s\n", e.Error())
 		}
 	}
-	return str
+	return fmt.Sprintf("```%s```", str) // Slack Code Block
 }
 
 func main() {
