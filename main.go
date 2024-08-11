@@ -12,6 +12,8 @@ import (
 	"strings"
 )
 
+var slackWebhook string // Provide value during build time, e.g. go build -ldflags "-X main.slackWebhook=SECRET_VALUE"
+
 type SlackMessage struct {
 	Blocks []Block `json:"blocks"`
 }
@@ -126,7 +128,6 @@ func formatErrors(errs []error) string {
 }
 
 func main() {
-	slackWebhook := os.Getenv("SLACK_WEBHOOK")
 	if slackWebhook == "" {
 		log.Fatal("slack webhook environment variable missing")
 	}
