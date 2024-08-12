@@ -10,9 +10,15 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 )
 
 var slackWebhook string // Provide value during build time, e.g. go build -ldflags "-X main.slackWebhook=SECRET_VALUE"
+func init() {
+	if slackWebhook == "" {
+		slackWebhook = os.Getenv("SLACK_WEBHOOK") // Fallback to environment variable
+	}
+}
 
 type SlackMessage struct {
 	Blocks []Block `json:"blocks"`
@@ -86,6 +92,17 @@ func alertToSlack(jsonPayload []byte, slackWebhook string) error {
 	return nil
 }
 
+func isCreatedToday(fileInfo os.FileInfo) (bool, error) {
+	modTime := fileInfo.ModTime()
+	now := time.Now()
+
+	// Truncate times to the day level for comparison
+	modDay := modTime.Truncate(24 * time.Hour)
+	today := now.Truncate(24 * time.Hour)
+
+	return modDay.Equal(today), nil
+}
+
 func getFileInfo(basePath string, files []string) []error {
 	// Slice to hold all errors
 	errs := []error{}
@@ -106,8 +123,14 @@ func getFileInfo(basePath string, files []string) []error {
 		} else {
 			// File exists, check if the file size is greather than 0 bytes.
 			fileSize := fileInfo.Size()
-			switch fileSize {
-			case 0:
+			fileCreatedToday, _ := isCreatedToday(fileInfo)
+			switch {
+			case !fileCreatedToday:
+				err := errors.New("file has a timestamp older than today")
+				err = fmt.Errorf("%w: %s", err, filePath)
+				errs = append(errs, err)
+
+			case fileSize == 0:
 				err := errors.New("file has 0 bytes of data")
 				err = fmt.Errorf("%w: %s", err, filePath)
 				errs = append(errs, err)
