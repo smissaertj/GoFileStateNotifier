@@ -139,9 +139,8 @@ func main() {
 	}
 
 	errs := getFileInfo(basePath, outputFiles)
-	slackErrorMsg := formatErrors(errs)
-
-	if slackErrorMsg != "" {
+	if len(errs) > 0 {
+		slackErrorMsg := formatErrors(errs)
 		payload, err := formatSlackPayload(slackErrorMsg)
 		if err != nil {
 			log.Fatal(err.Error())
