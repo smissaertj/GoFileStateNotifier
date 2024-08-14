@@ -151,6 +151,7 @@ func formatErrors(errs []error) string {
 }
 
 func main() {
+	log.Print("Started run")
 	if slackWebhook == "" {
 		log.Fatal("slack webhook environment variable missing")
 	}
@@ -172,4 +173,5 @@ func main() {
 			log.Fatal(err.Error())
 		}
 	}
+	log.Print("Completed run")
 }
